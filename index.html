@@ -35,7 +35,6 @@
             position: relative;
         }
 
-        /* --- UI Header --- */
         #header {
             width: 100%;
             padding: 15px;
@@ -53,7 +52,6 @@
             text-shadow: 0 0 10px rgba(78, 204, 163, 0.5);
         }
 
-        /* --- Game Board --- */
         #game-wrapper {
             position: relative;
             margin: 20px auto;
@@ -81,7 +79,6 @@
             border-radius: 5px;
         }
 
-        /* Peças Animadas */
         .tile {
             position: absolute;
             border-radius: 5px;
@@ -110,7 +107,6 @@
             100% { transform: scale(1); }
         }
 
-        /* Cores dos Blocos padrão (até 2048) */
         .tile[data-value="2"] .tile-inner { background: #eee4da; color: #776e65; }
         .tile[data-value="4"] .tile-inner { background: #ede0c8; color: #776e65; }
         .tile[data-value="8"] .tile-inner { background: #f2b179; color: white; }
@@ -123,7 +119,6 @@
         .tile[data-value="1024"] .tile-inner { background: #edc53f; color: white; }
         .tile[data-value="2048"] .tile-inner { background: #edc22e; color: white; box-shadow: 0 0 15px gold; }
 
-        /* Estilo para valores acima de 2048 (todos pretos com brilho) */
         .tile.high-value .tile-inner {
             background: #111111;
             color: white;
@@ -131,7 +126,6 @@
             border: 1px solid rgba(255,255,255,0.3);
         }
 
-        /* --- Floating Text / Mensagens --- */
         .floating-money, .floating-congrats {
             position: absolute;
             font-weight: bold;
@@ -154,7 +148,6 @@
             100% { transform: translateY(-50px); opacity: 0; }
         }
 
-        /* --- Shop (scroll horizontal) --- */
         #shop {
             position: fixed;
             bottom: 0;
@@ -201,7 +194,7 @@
 
         .shop-item:active { transform: scale(0.96); }
         .shop-item.disabled { opacity: 0.5; filter: grayscale(1); cursor: default; pointer-events: none; }
-        .shop-item.hidden { display: none; }  /* para esconder o expandir no max */
+        .shop-item.hidden { display: none; }
 
         .shop-item h4 { font-size: 0.9rem; margin-bottom: 6px; color: #ddd; }
         .shop-item .price { font-weight: bold; color: var(--accent); font-size: 1rem; }
@@ -300,12 +293,18 @@
             organizeCooldownMoves: 0,
             isAnimating: false,
             nextId: 0,
-            hasReached2048: false
+            hasReached2048: false,
+            // Fatores de aumento de preço (começam com valores base)
+            priceMultipliers: {
+                minTile: 1.25,
+                organize: 1.40,
+                expand: 1.60
+            }
         };
 
         const ORGANIZE_COOLDOWN_MAX_MOVES = 5;
         const MAX_GRID_SIZE = 8;
-        const PRICE_INCREASE_RATE = 1.5; // 50% de aumento
+        const RATE_INCREASE = 1.5;  // A cada compra, o multiplicador de preço é multiplicado por 1.5 (aumento de 50%)
 
         const wrapper = document.getElementById('game-wrapper');
         const bgGrid = document.getElementById('grid-background');
@@ -314,6 +313,7 @@
         let musicEnabled = false;
         const bgMusic = document.getElementById('bg-music');
 
+        // Encurtador de números (K, M, B, T...)
         function formatTileValue(value) {
             if (value < 262144) return value.toString();
             const suffixes = ["", "K", "M", "B", "T", "Qa", "Qi", "Sx", "Sp", "Oc", "No", "Dc"];
@@ -395,7 +395,11 @@
             state.money -= state.prices.minTile;
             state.minTilePower++;
             state.levels.minTile++;
-            state.prices.minTile = Math.ceil(state.prices.minTile * PRICE_INCREASE_RATE);
+            
+            // Aplica o multiplicador atual e depois aumenta o multiplicador para a próxima compra
+            const multiplier = state.priceMultipliers.minTile;
+            state.prices.minTile = Math.ceil(state.prices.minTile * multiplier);
+            state.priceMultipliers.minTile = Math.ceil(state.priceMultipliers.minTile * RATE_INCREASE * 100) / 100; // Aumenta 50% arredondado
             
             const minAllowed = Math.pow(2, state.minTilePower);
             state.grid = state.grid.map(t => {
@@ -576,7 +580,9 @@
                 const oldGrid = [...state.grid];
                 const oldSize = state.gridSize;
                 state.gridSize++;
-                state.prices.expand = Math.ceil(state.prices.expand * PRICE_INCREASE_RATE);
+                const multiplier = state.priceMultipliers.expand;
+                state.prices.expand = Math.ceil(state.prices.expand * multiplier);
+                state.priceMultipliers.expand = Math.ceil(state.priceMultipliers.expand * RATE_INCREASE * 100) / 100;
                 state.grid = Array(state.gridSize * state.gridSize).fill(null);
                 for(let r=0; r<oldSize; r++) {
                     for(let c=0; c<oldSize; c++) {
@@ -586,7 +592,7 @@
                 setupGridUI();
                 renderGrid();
                 saveGame();
-                checkExpandVisibility(); // esconde se atingiu máximo
+                checkExpandVisibility();
             }
         }
 
@@ -606,8 +612,9 @@
                 state.money -= state.prices.organize;
                 state.isAnimating = true;
 
-                // Aumento de 50% no preço
-                state.prices.organize = Math.ceil(state.prices.organize * PRICE_INCREASE_RATE);
+                const multiplier = state.priceMultipliers.organize;
+                state.prices.organize = Math.ceil(state.prices.organize * multiplier);
+                state.priceMultipliers.organize = Math.ceil(state.priceMultipliers.organize * RATE_INCREASE * 100) / 100;
 
                 let tiles = state.grid.filter(t => t !== null).sort((a, b) => b.value - a.value);
                 let newGrid = Array(state.gridSize * state.gridSize).fill(null);
@@ -713,6 +720,10 @@
                 state.isAnimating = false;
                 if (state.organizeCooldownMoves === undefined) state.organizeCooldownMoves = 0;
                 if (state.organizeCooldownMoves < 0) state.organizeCooldownMoves = 0;
+                if (!state.priceMultipliers) {
+                    // fallback para saves antigos
+                    state.priceMultipliers = { minTile: 1.25, organize: 1.40, expand: 1.60 };
+                }
             }
         }
 
