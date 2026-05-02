@@ -21,7 +21,6 @@
             margin: 0;
             padding: 0;
             user-select: none;
-            /* Não aplicar touch-action globalmente para não travar o scroll da loja */
         }
 
         body {
@@ -65,7 +64,7 @@
             height: 90vw;
             max-width: 500px;
             max-height: 500px;
-            touch-action: none; /* Impede scroll da página ao jogar */
+            touch-action: none;
         }
 
         #grid-background {
@@ -80,8 +79,6 @@
         .grid-cell {
             background: rgba(255,255,255,0.05);
             border-radius: 5px;
-            width: 100%;
-            height: 100%;
         }
 
         /* Peças Animadas */
@@ -105,6 +102,7 @@
             align-items: center;
             border-radius: 5px;
             animation: pop 0.2s ease-out;
+            font-size: inherit;
         }
 
         @keyframes pop {
@@ -112,27 +110,43 @@
             100% { transform: scale(1); }
         }
 
-        /* Cores dos Blocos */
-        .tile[data-value="2"] .tile-inner { background: #eee4da; color: #776e65; font-size: 2rem; }
-        .tile[data-value="4"] .tile-inner { background: #ede0c8; color: #776e65; font-size: 2rem; }
-        .tile[data-value="8"] .tile-inner { background: #f2b179; color: white; font-size: 2rem; }
-        .tile[data-value="16"] .tile-inner { background: #f59563; color: white; font-size: 2rem; }
-        .tile[data-value="32"] .tile-inner { background: #f67c5f; color: white; font-size: 2rem; }
-        .tile[data-value="64"] .tile-inner { background: #f65e3b; color: white; font-size: 2rem; }
-        .tile[data-value="128"] .tile-inner { background: #edcf72; color: white; font-size: 1.5rem; }
-        .tile[data-value="256"] .tile-inner { background: #edcc61; color: white; font-size: 1.5rem; }
-        .tile[data-value="512"] .tile-inner { background: #edc850; color: white; font-size: 1.5rem; }
-        .tile[data-value="1024"] .tile-inner { background: #edc53f; color: white; font-size: 1.2rem; }
-        .tile[data-value="2048"] .tile-inner { background: #edc22e; color: white; font-size: 1.2rem; box-shadow: 0 0 15px gold; }
+        /* Cores dos Blocos padrão (até 2048) */
+        .tile[data-value="2"] .tile-inner { background: #eee4da; color: #776e65; }
+        .tile[data-value="4"] .tile-inner { background: #ede0c8; color: #776e65; }
+        .tile[data-value="8"] .tile-inner { background: #f2b179; color: white; }
+        .tile[data-value="16"] .tile-inner { background: #f59563; color: white; }
+        .tile[data-value="32"] .tile-inner { background: #f67c5f; color: white; }
+        .tile[data-value="64"] .tile-inner { background: #f65e3b; color: white; }
+        .tile[data-value="128"] .tile-inner { background: #edcf72; color: white; }
+        .tile[data-value="256"] .tile-inner { background: #edcc61; color: white; }
+        .tile[data-value="512"] .tile-inner { background: #edc850; color: white; }
+        .tile[data-value="1024"] .tile-inner { background: #edc53f; color: white; }
+        .tile[data-value="2048"] .tile-inner { background: #edc22e; color: white; box-shadow: 0 0 15px gold; }
 
-        /* --- Floating Text --- */
-        .floating-money {
+        /* Estilo para valores acima de 2048 (todos pretos com brilho) */
+        .tile.high-value .tile-inner {
+            background: #111111;
+            color: white;
+            box-shadow: 0 0 10px rgba(255,255,255,0.5);
+            border: 1px solid rgba(255,255,255,0.3);
+        }
+
+        /* --- Floating Text / Mensagens --- */
+        .floating-money, .floating-congrats {
             position: absolute;
-            color: #4ecca3;
             font-weight: bold;
             pointer-events: none;
             animation: floatUp 0.8s forwards;
             z-index: 100;
+        }
+        .floating-money { color: #4ecca3; }
+        .floating-congrats {
+            color: gold;
+            font-size: 1.5rem;
+            text-shadow: 0 0 5px black;
+            left: 50%;
+            transform: translateX(-50%);
+            white-space: nowrap;
         }
 
         @keyframes floatUp {
@@ -140,7 +154,7 @@
             100% { transform: translateY(-50px); opacity: 0; }
         }
 
-        /* --- Shop (scroll horizontal corrigido) --- */
+        /* --- Shop (scroll horizontal) --- */
         #shop {
             position: fixed;
             bottom: 0;
@@ -154,14 +168,13 @@
             gap: 12px;
             border-top: 2px solid var(--text-color);
             z-index: 20;
-            touch-action: pan-x pinch-zoom; /* Permite rolagem horizontal suave no mobile */
+            touch-action: pan-x pinch-zoom;
             -webkit-overflow-scrolling: touch;
             scrollbar-width: thin;
             display: flex;
             flex-wrap: nowrap;
         }
 
-        /* Estilo da scrollbar (opcional) */
         #shop::-webkit-scrollbar {
             height: 4px;
         }
@@ -174,7 +187,7 @@
         }
 
         .shop-item {
-            flex: 0 0 auto; /* Impede encolhimento */
+            flex: 0 0 auto;
             width: 150px;
             background: #16213e;
             padding: 12px;
@@ -193,9 +206,8 @@
         .shop-item .price { font-weight: bold; color: var(--accent); font-size: 1rem; }
         .shop-item .level { font-size: 0.7rem; color: #e94560; margin-top: 4px; }
 
-        /* Controles */
         #controls {
-            margin: 10px auto 80px auto; /* Espaço inferior para não esconder atrás da shop */
+            margin: 10px auto 80px auto;
             display: flex;
             gap: 20px;
             z-index: 5;
@@ -249,7 +261,6 @@
         <button class="btn-action" onclick="resetGame()">Reiniciar Tudo</button>
     </div>
 
-    <!-- Loja com scroll horizontal -->
     <div id="shop">
         <div class="shop-item" onclick="buyMinTile()">
             <h4>🔼 Valor Mínimo</h4>
@@ -275,10 +286,8 @@
             <div id="mult-price" class="price">$ 150</div>
             <div id="mult-level" class="level">x1</div>
         </div>
-        <!-- Adicione mais itens se quiser; o scroll será automático -->
     </div>
 
-    <!-- Áudios -->
     <audio id="sfx-merge" src="https://actions.google.com/sounds/v1/water/air_squish_01.ogg"></audio>
     <audio id="sfx-cash" src="https://actions.google.com/sounds/v1/office/typing_fast.ogg"></audio>
     <audio id="bg-music" loop>
@@ -296,7 +305,8 @@
             levels: { minTile: 0, expand: 1, mult: 1 },
             organizeCooldown: false,
             isAnimating: false,
-            nextId: 0
+            nextId: 0,
+            hasReached2048: false      // flag para o primeiro 2048
         };
 
         const wrapper = document.getElementById('game-wrapper');
@@ -347,8 +357,22 @@
             }
         }
 
+        // Calcula tamanho da fonte baseado no tamanho da tile e no número de dígitos
+        function getFontSizeForTile(value, gridSize) {
+            const wrapperWidth = wrapper.clientWidth;
+            if (!wrapperWidth) return '1.5rem';
+            const tileTotalWidth = wrapperWidth - 20; // padding do wrapper
+            const gap = 10;
+            const tileSize = (tileTotalWidth - gap * (gridSize - 1)) / gridSize;
+            const digits = value.toString().length;
+            let fontSize = Math.min(tileSize * 0.4, 40); // máximo 40px
+            if (digits > 3) fontSize = fontSize * 0.8;
+            if (digits > 4) fontSize = fontSize * 0.7;
+            return `${Math.max(12, fontSize)}px`;
+        }
+
         function renderGrid() {
-            const size = 100 / state.gridSize;
+            const sizePercent = 100 / state.gridSize;
             const currentIds = state.grid.filter(t => t !== null).map(t => t.id);
             const tileElements = Array.from(tileContainer.children);
 
@@ -365,19 +389,32 @@
                         el = document.createElement('div');
                         el.className = 'tile';
                         el.dataset.id = tile.id;
-                        el.innerHTML = `<div class="tile-inner">${tile.value}</div>`;
+                        el.innerHTML = `<div class="tile-inner"></div>`;
                         tileContainer.appendChild(el);
                     }
                     
                     const row = Math.floor(index / state.gridSize);
                     const col = index % state.gridSize;
                     
-                    el.style.width = `calc(${size}% - 10px)`;
-                    el.style.height = `calc(${size}% - 10px)`;
-                    el.style.top = `calc(${row * size}% + 5px)`;
-                    el.style.left = `calc(${col * size}% + 5px)`;
+                    el.style.width = `calc(${sizePercent}% - 10px)`;
+                    el.style.height = `calc(${sizePercent}% - 10px)`;
+                    el.style.top = `calc(${row * sizePercent}% + 5px)`;
+                    el.style.left = `calc(${col * sizePercent}% + 5px)`;
                     el.setAttribute('data-value', tile.value);
-                    el.querySelector('.tile-inner').innerText = tile.value;
+                    
+                    const inner = el.querySelector('.tile-inner');
+                    inner.innerText = tile.value;
+                    
+                    // Aplica estilo especial para valores > 2048
+                    if (tile.value > 2048) {
+                        el.classList.add('high-value');
+                    } else {
+                        el.classList.remove('high-value');
+                    }
+                    
+                    // Ajusta fonte dinamicamente
+                    const fontSize = getFontSizeForTile(tile.value, state.gridSize);
+                    inner.style.fontSize = fontSize;
                 }
             });
 
@@ -419,6 +456,12 @@
                         compressed.splice(j + 1, 1);
                         earnMoney(newValue);
                         playSFX('sfx-merge');
+                        
+                        // Verifica se é o primeiro 2048
+                        if (newValue === 2048 && !state.hasReached2048) {
+                            state.hasReached2048 = true;
+                            showCongrats("🎉 PARABÉNS! 2048 ALCANÇADO! 🎉");
+                        }
                     }
                 }
 
@@ -443,18 +486,28 @@
         function earnMoney(amount) {
             const total = amount * state.multiplier;
             state.money += total;
-            showFloatingText(`+$${total}`);
+            showFloatingText(`+$${total}`, '#4ecca3');
             playSFX('sfx-cash');
         }
 
-        function showFloatingText(text) {
+        function showFloatingText(text, color = '#4ecca3') {
             const el = document.createElement('div');
             el.className = 'floating-money';
             el.innerText = text;
+            el.style.color = color;
             el.style.left = `${Math.random() * 60 + 20}%`;
             el.style.top = `40%`;
             wrapper.appendChild(el);
             setTimeout(() => el.remove(), 800);
+        }
+
+        function showCongrats(message) {
+            const el = document.createElement('div');
+            el.className = 'floating-congrats';
+            el.innerText = message;
+            el.style.top = '30%';
+            wrapper.appendChild(el);
+            setTimeout(() => el.remove(), 3000);
         }
 
         function buyMinTile() {
@@ -575,7 +628,6 @@
                     btn.style.background = '#e94560';
                     btn.style.color = 'white';
                 }).catch(() => {
-                    // Tenta novamente com interação
                     bgMusic.play().catch(() => {});
                     musicEnabled = true;
                     btn.innerText = '🎵 Música ON';
@@ -614,7 +666,6 @@
             }
         }
 
-        // Eventos de teclado
         window.addEventListener('keydown', e => {
             if (e.key.includes('Arrow')) {
                 e.preventDefault();
@@ -622,10 +673,9 @@
             }
         });
 
-        // Touch para o jogo (apenas na área do game-wrapper)
         let tsX, tsY;
         wrapper.addEventListener('touchstart', e => {
-            e.preventDefault(); // necessário para evitar scroll da página
+            e.preventDefault();
             tsX = e.touches[0].clientX;
             tsY = e.touches[0].clientY;
         });
@@ -639,6 +689,8 @@
                 if (Math.abs(dy) > 20) move(dy > 0 ? 'down' : 'up');
             }
         });
+
+        window.addEventListener('resize', () => renderGrid()); // Reajusta fontes ao redimensionar
 
         init();
     </script>
