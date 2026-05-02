@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IMPÉRIO DO NADA 3.1</title>
+    <style>
+        :root { 
+            --bg: #030303; 
+            --text: #ffffff; 
+            --accent: #222;
+            --glow: rgba(255, 255, 255, 0);
+        }
+        
+        body {
+            background-color: var(--bg);
+            color: var(--text);
+            font-family: 'Courier New', Courier, monospace;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            margin: 0;
+            overflow: hidden;
+            transition: all 1s ease;
+            box-shadow: inset 0 0 100px var(--glow);
+        }
+
+        #game-container { 
+            text-align: center; 
+            width: 90%; 
+            max-width: 600px; 
+            z-index: 10;
+        }
+
+        #nothing-counter {
+            font-size: clamp(2rem, 8vw, 4rem);
+            margin-bottom: 5px;
+            font-weight: bold;
+            text-shadow: 0 0 20px var(--glow);
+        }
+
+        #nps-display {
+            font-size: 0.9rem;
+            color: #666;
+            margin-bottom: 25px;
+            letter-spacing: 2px;
+        }
+
+        #main-button {
+            padding: 40px 80px;
+            font-size: 1.5rem;
+            background: #fff;
+            border: none;
+            cursor: pointer;
+            font-weight: bold;
+            transition: all 0.2s;
+            outline: none;
+        }
+
+        #main-button:hover { transform: scale(1.02); box-shadow: 0 0 40px rgba(255,255,255,0.3); }
+        #main-button:active { transform: scale(0.90); background: #ccc; }
+
+        .upgrade-list {
+            margin-top: 40px;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+        }
+
+        .upgrade-btn {
+            background: rgba(255,255,255,0.03);
+            color: #fff;
+            border: 1px solid var(--accent);
+            padding: 15px;
+            cursor: pointer;
+            text-align: left;
+            transition: 0.3s;
+            position: relative;
+        }
+
+        .upgrade-btn:hover:not(:disabled) { background: rgba(255,255,255,0.1); border-color: #fff; }
+        .upgrade-btn:disabled { opacity: 0.1; cursor: not-allowed; }
+        
+        .up-name { display: block; font-weight: bold; font-size: 0.8rem; text-transform: uppercase; }
+        .up-cost { font-size: 0.7rem; color: #777; }
+        .up-count { position: absolute; right: 8px; bottom: 5px; font-size: 1rem; font-weight: bold; color: #444; }
+
+        #save-msg {
+            position: fixed;
+            bottom: 15px;
+            font-size: 0.6rem;
+            color: #333;
+            text-transform: uppercase;
+        }
+
+        /* Efeitos visuais por upgrade */
+        .void-active { animation: pulse-bg 4s infinite; }
+        @keyframes pulse-bg {
+            0% { background-color: #030303; }
+            50% { background-color: #0a000f; }
+            100% { background-color: #030303; }
+        }
+    </style>
+</head>
+<body id="body">
+
+    <div id="game-container">
+        <div id="nothing-counter">0</div>
+        <div id="nps-display">INEXISTÊNCIA ESTÁVEL</div>
+        
+        <button id="main-button">NADA</button>
+
+        <div class="upgrade-list" id="upgrades-grid"></div>
+    </div>
+
+    <div id="save-msg">SISTEMA OPERACIONAL DO VAZIO ATIVO</div>
+
+    <script>
+        // --- MOTOR DE ÁUDIO (Sintetizador) ---
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        let ambientOsc = null;
+        let ambientGain = null;
+
+        function playSound(freq, type, duration, vol) {
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.type = type;
+            osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+            gain.gain.setValueAtTime(vol, audioCtx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.00001, audioCtx.currentTime + duration);
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            osc.start();
+            osc.stop(audioCtx.currentTime + duration);
+        }
+
+        function initAmbient() {
+            if (ambientOsc) return;
+            ambientOsc = audioCtx.createOscillator();
+            ambientGain = audioCtx.createGain();
+            ambientOsc.type = 'sine';
+            ambientOsc.frequency.setValueAtTime(40, audioCtx.currentTime);
+            ambientGain.gain.setValueAtTime(0, audioCtx.currentTime);
+            ambientOsc.connect(ambientGain);
+            ambientGain.connect(audioCtx.destination);
+            ambientOsc.start();
+        }
+
+        // --- ESTADO DO JOGO ---
+        let state = {
+            nadas: 0,
+            upgradesOwned: [0, 0, 0, 0, 0, 0, 0, 0]
+        };
+
+        const upgradeData = [
+            { name: "Eco Estático", cost: 15, power: 1, type: 'click' },
+            { name: "Vento do Vácuo", cost: 100, power: 1, type: 'auto' },
+            { name: "Sombra Digital", cost: 600, power: 6, type: 'auto' },
+            { name: "Pulso Negro", cost: 3000, power: 30, type: 'auto' },
+            { name: "Mantra do Vazio", cost: 12000, power: 120, type: 'auto' },
+            { name: "Colisor de Nada", cost: 65000, power: 550, type: 'auto' },
+            { name: "Singularidade", cost: 250000, power: 2200, type: 'auto' },
+            { name: "Deletador de Realidade", cost: 1000000, power: 10000, type: 'auto' }
+        ];
+
+        let nps = 0;
+        let npc = 1;
+
+        // --- LÓGICA CORE ---
+        function calculateStats() {
+            nps = 0;
+            npc = 1;
+            state.upgradesOwned.forEach((count, i) => {
+                if (upgradeData[i].type === 'click') npc += (upgradeData[i].power * count);
+                else nps += (upgradeData[i].power * count);
+            });
+            
+            // Atualiza o som ambiente baseado no NPS
+            if (ambientGain) {
+                const vol = Math.min(nps / 10000, 0.1);
+                ambientGain.gain.setTargetAtTime(vol, audioCtx.currentTime, 0.5);
+                ambientOsc.frequency.setTargetAtTime(40 + (nps/500), audioCtx.currentTime, 0.5);
+            }
+            
+            if (state.upgradesOwned[4] > 0) document.body.classList.add('void-active');
+        }
+
+        function buyUpgrade(i) {
+            const cost = Math.floor(upgradeData[i].cost * Math.pow(1.2, state.upgradesOwned[i]));
+            if (state.nadas >= cost) {
+                state.nadas -= cost;
+                state.upgradesOwned[i]++;
+                playSound(150 - (i * 10), 'triangle', 0.5, 0.2);
+                calculateStats();
+                renderUpgrades();
+                save();
+            }
+        }
+
+        // --- INTERFACE ---
+        function renderUpgrades() {
+            const grid = document.getElementById('upgrades-grid');
+            grid.innerHTML = '';
+            upgradeData.forEach((up, i) => {
+                const count = state.upgradesOwned[i];
+                const cost = Math.floor(up.cost * Math.pow(1.2, count));
+                const btn = document.createElement('button');
+                btn.className = 'upgrade-btn';
+                btn.disabled = state.nadas < cost;
+                btn.onclick = () => buyUpgrade(i);
+                btn.innerHTML = `
+                    <span class="up-name">${up.name}</span>
+                    <span class="up-cost">CUSTO: ${cost.toLocaleString()}</span>
+                    <span class="up-count">${count}</span>
+                `;
+                grid.appendChild(btn);
+            });
+        }
+
+        document.getElementById('main-button').onclick = () => {
+            initAmbient();
+            state.nadas += npc;
+            playSound(400 + (Math.random() * 50), 'sine', 0.1, 0.1);
+            updateUI();
+        };
+
+        function updateUI() {
+            document.getElementById('nothing-counter').innerText = Math.floor(state.nadas).toLocaleString();
+            document.getElementById('nps-display').innerText = nps > 0 ? `${nps.toLocaleString()} NADAS/SEG` : "INEXISTÊNCIA ESTÁVEL";
+            
+            document.querySelectorAll('.upgrade-btn').forEach((btn, i) => {
+                const cost = Math.floor(upgradeData[i].cost * Math.pow(1.2, state.upgradesOwned[i]));
+                btn.disabled = state.nadas < cost;
+            });
+        }
+
+        // --- SISTEMA ---
+        function save() { localStorage.setItem('imperio31', JSON.stringify(state)); }
+        function load() {
+            const saved = localStorage.getItem('imperio31');
+            if (saved) state = JSON.parse(saved);
+            calculateStats();
+            renderUpgrades();
+        }
+
+        setInterval(() => {
+            if (nps > 0) {
+                state.nadas += (nps / 10);
+                updateUI();
+            }
+        }, 100);
+
+        load();
+    </script>
+</body>
+</html>
