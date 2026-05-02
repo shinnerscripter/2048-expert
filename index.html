@@ -229,7 +229,7 @@
             background: var(--accent);
             width: 0%;
             margin-top: 8px;
-            transition: width linear;
+            transition: width 0.2s linear;
         }
 
         .music-toggle {
@@ -296,11 +296,13 @@
             minTilePower: 1,
             prices: { minTile: 100, organize: 500, expand: 2000 },
             levels: { minTile: 0, expand: 1 },
-            organizeCooldown: false,
+            organizeCooldownMoves: 0,      // movimentos restantes para desbloquear
             isAnimating: false,
             nextId: 0,
             hasReached2048: false
         };
+
+        const ORGANIZE_COOLDOWN_MAX_MOVES = 5;  // número de movimentos necessários
 
         const wrapper = document.getElementById('game-wrapper');
         const bgGrid = document.getElementById('grid-background');
@@ -308,6 +310,25 @@
         const moneyEl = document.getElementById('money-display');
         let musicEnabled = false;
         const bgMusic = document.getElementById('bg-music');
+
+        // Função para encurtar números grandes (K, M, B, T, Qa, Qi, ...)
+        function formatTileValue(value) {
+            if (value < 262144) return value.toString();
+            
+            const suffixes = ["", "K", "M", "B", "T", "Qa", "Qi", "Sx", "Sp", "Oc", "No", "Dc"];
+            let magnitude = 0;
+            let temp = value;
+            while (temp >= 1000 && magnitude < suffixes.length - 1) {
+                temp /= 1000;
+                magnitude++;
+            }
+            // Formata com 1 casa decimal se < 1000 na nova unidade, senão inteiro
+            if (temp < 10) {
+                return temp.toFixed(1) + suffixes[magnitude];
+            } else {
+                return Math.floor(temp) + suffixes[magnitude];
+            }
+        }
 
         function init() {
             loadGame();
@@ -318,6 +339,7 @@
                 renderGrid();
             }
             updateShopUI();
+            updateOrganizeCooldownUI();
         }
 
         function setupGridUI() {
@@ -358,12 +380,10 @@
             return max;
         }
 
-        // Verifica se é seguro comprar o upgrade de valor mínimo
         function canBuyMinTile() {
             if (state.money < state.prices.minTile) return false;
             const newMinValue = Math.pow(2, state.minTilePower + 1);
             const currentMax = getMaxTileValue();
-            // Se não há peças ou a maior peça é menor que o novo mínimo, não pode comprar (tabuleiro ficaria vazio)
             if (currentMax === 0) return false;
             return currentMax >= newMinValue;
         }
@@ -376,16 +396,12 @@
             state.levels.minTile++;
             state.prices.minTile = Math.floor(state.prices.minTile * 2.5);
             
-            // Remove todas as peças com valor menor que o novo mínimo
             const minAllowed = Math.pow(2, state.minTilePower);
             state.grid = state.grid.map(t => {
-                if (t !== null && t.value < minAllowed) {
-                    return null;
-                }
+                if (t !== null && t.value < minAllowed) return null;
                 return t;
             });
             
-            // Se por algum motivo o tabuleiro ficou vazio (não deveria, pois canBuyMinTile garantiu), adiciona uma peça
             if (state.grid.every(cell => cell === null)) {
                 addRandomTile();
             }
@@ -400,10 +416,12 @@
             const tileTotalWidth = wrapperWidth - 20;
             const gap = 10;
             const tileSize = (tileTotalWidth - gap * (gridSize - 1)) / gridSize;
-            const digits = value.toString().length;
+            const displayStr = formatTileValue(value);
+            const digits = displayStr.length;
             let fontSize = Math.min(tileSize * 0.4, 40);
             if (digits > 3) fontSize = fontSize * 0.8;
             if (digits > 4) fontSize = fontSize * 0.7;
+            if (digits > 5) fontSize = fontSize * 0.6;
             return `${Math.max(12, fontSize)}px`;
         }
 
@@ -439,7 +457,8 @@
                     el.setAttribute('data-value', tile.value);
                     
                     const inner = el.querySelector('.tile-inner');
-                    inner.innerText = tile.value;
+                    // Exibe número encurtado se for >= 262144
+                    inner.innerText = formatTileValue(tile.value);
                     
                     if (tile.value > 2048) {
                         el.classList.add('high-value');
@@ -513,6 +532,16 @@
                 renderGrid();
                 saveGame();
                 state.isAnimating = false;
+                
+                // --- Atualiza cooldown do organizador baseado em movimento ---
+                if (state.organizeCooldownMoves > 0) {
+                    state.organizeCooldownMoves--;
+                    updateOrganizeCooldownUI();
+                    if (state.organizeCooldownMoves === 0) {
+                        // Reativa o botão (a classe disabled será removida no updateShopUI)
+                        updateShopUI();
+                    }
+                }
             }
         }
 
@@ -562,10 +591,15 @@
         }
 
         async function buyOrganize() {
-            if (state.organizeCooldown || state.isAnimating) return;
+            // Verifica se está em cooldown ou já tem movimentos pendentes
+            if (state.organizeCooldownMoves > 0) return;
+            if (state.isAnimating) return;
             if (state.money >= state.prices.organize) {
                 state.money -= state.prices.organize;
                 state.isAnimating = true;
+
+                // Aplica aumento de 20% no preço para a próxima compra
+                state.prices.organize = Math.ceil(state.prices.organize * 1.2);
 
                 let tiles = state.grid.filter(t => t !== null).sort((a, b) => b.value - a.value);
                 let newGrid = Array(state.gridSize * state.gridSize).fill(null);
@@ -586,27 +620,26 @@
                 state.grid = newGrid;
                 renderGrid();
 
-                state.organizeCooldown = true;
-                const btn = document.getElementById('organize-btn');
-                const bar = document.getElementById('cooldown-bar');
-                btn.classList.add('disabled');
-                
-                bar.style.transition = 'none';
-                bar.style.width = '0%';
-                setTimeout(() => {
-                    bar.style.transition = 'width 10s linear';
-                    bar.style.width = '100%';
-                }, 50);
-
-                setTimeout(() => {
-                    state.organizeCooldown = false;
-                    btn.classList.remove('disabled');
-                    bar.style.width = '0%';
-                }, 10000);
+                // Inicia cooldown baseado em movimentos
+                state.organizeCooldownMoves = ORGANIZE_COOLDOWN_MAX_MOVES;
+                updateOrganizeCooldownUI();
 
                 await new Promise(r => setTimeout(r, 300));
                 state.isAnimating = false;
                 saveGame();
+            }
+        }
+
+        function updateOrganizeCooldownUI() {
+            const btn = document.getElementById('organize-btn');
+            const bar = document.getElementById('cooldown-bar');
+            if (state.organizeCooldownMoves > 0) {
+                const progress = (ORGANIZE_COOLDOWN_MAX_MOVES - state.organizeCooldownMoves) / ORGANIZE_COOLDOWN_MAX_MOVES * 100;
+                bar.style.width = `${progress}%`;
+                btn.classList.add('disabled');
+            } else {
+                bar.style.width = '0%';
+                btn.classList.remove('disabled');
             }
         }
 
@@ -617,13 +650,15 @@
             document.getElementById('expand-price').innerText = `$ ${state.prices.expand.toLocaleString()}`;
             document.getElementById('expand-level').innerText = `${state.gridSize}x${state.gridSize}`;
             
-            // Controla o estado do botão Valor Mínimo
             const minTileBtn = document.getElementById('minTileBtn');
             if (!canBuyMinTile()) {
                 minTileBtn.classList.add('disabled');
             } else {
                 minTileBtn.classList.remove('disabled');
             }
+            
+            // Atualiza visual do cooldown
+            updateOrganizeCooldownUI();
         }
 
         function playSFX(id) {
@@ -659,8 +694,7 @@
         function saveGame() {
             localStorage.setItem('2048TycoonSave_final', JSON.stringify({
                 ...state,
-                isAnimating: false,
-                organizeCooldown: false
+                isAnimating: false
             }));
         }
 
@@ -670,7 +704,9 @@
                 const loaded = JSON.parse(saved);
                 state = { ...state, ...loaded };
                 state.isAnimating = false;
-                state.organizeCooldown = false;
+                // Garante que o cooldown não fique negativo
+                if (state.organizeCooldownMoves === undefined) state.organizeCooldownMoves = 0;
+                if (state.organizeCooldownMoves < 0) state.organizeCooldownMoves = 0;
             }
         }
 
