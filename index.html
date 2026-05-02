@@ -2,258 +2,615 @@
 <html lang="pt-br">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>IMPÉRIO DO NADA 3.1</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>2048 Tycoon: Império dos Blocos</title>
     <style>
-        :root { 
-            --bg: #030303; 
-            --text: #ffffff; 
-            --accent: #222;
-            --glow: rgba(255, 255, 255, 0);
+        :root {
+            --bg-color: #1a1a2e;
+            --grid-bg: #16213e;
+            --text-color: #e94560;
+            --panel-bg: #0f3460;
+            --accent: #4ecca3;
+            --tile-font: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            --grid-size: 4;
+            --anim-speed: 0.3s;
         }
-        
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            user-select: none;
+            touch-action: none;
+        }
+
         body {
-            background-color: var(--bg);
-            color: var(--text);
-            font-family: 'Courier New', Courier, monospace;
+            background-color: var(--bg-color);
+            color: white;
+            font-family: var(--tile-font);
             display: flex;
             flex-direction: column;
             align-items: center;
-            justify-content: center;
-            min-height: 100vh;
-            margin: 0;
+            height: 100vh;
             overflow: hidden;
-            transition: all 1s ease;
-            box-shadow: inset 0 0 100px var(--glow);
         }
 
-        #game-container { 
-            text-align: center; 
-            width: 90%; 
-            max-width: 600px; 
+        /* --- UI Header --- */
+        #header {
+            width: 100%;
+            padding: 15px;
+            text-align: center;
+            background: var(--panel-bg);
+            box-shadow: 0 4px 10px rgba(0,0,0,0.3);
             z-index: 10;
         }
 
-        #nothing-counter {
-            font-size: clamp(2rem, 8vw, 4rem);
-            margin-bottom: 5px;
+        #money-display {
+            font-size: 2rem;
             font-weight: bold;
-            text-shadow: 0 0 20px var(--glow);
+            color: var(--accent);
+            text-shadow: 0 0 10px rgba(78, 204, 163, 0.5);
         }
 
-        #nps-display {
-            font-size: 0.9rem;
-            color: #666;
-            margin-bottom: 25px;
-            letter-spacing: 2px;
-        }
-
-        #main-button {
-            padding: 40px 80px;
-            font-size: 1.5rem;
-            background: #fff;
-            border: none;
-            cursor: pointer;
-            font-weight: bold;
-            transition: all 0.2s;
-            outline: none;
-        }
-
-        #main-button:hover { transform: scale(1.02); box-shadow: 0 0 40px rgba(255,255,255,0.3); }
-        #main-button:active { transform: scale(0.90); background: #ccc; }
-
-        .upgrade-list {
-            margin-top: 40px;
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 15px;
-        }
-
-        .upgrade-btn {
-            background: rgba(255,255,255,0.03);
-            color: #fff;
-            border: 1px solid var(--accent);
-            padding: 15px;
-            cursor: pointer;
-            text-align: left;
-            transition: 0.3s;
+        /* --- Game Board --- */
+        #game-wrapper {
             position: relative;
+            margin-top: 20px;
+            padding: 10px;
+            background: var(--grid-bg);
+            border-radius: 8px;
+            width: 90vw;
+            height: 90vw;
+            max-width: 500px;
+            max-height: 500px;
         }
 
-        .upgrade-btn:hover:not(:disabled) { background: rgba(255,255,255,0.1); border-color: #fff; }
-        .upgrade-btn:disabled { opacity: 0.1; cursor: not-allowed; }
-        
-        .up-name { display: block; font-weight: bold; font-size: 0.8rem; text-transform: uppercase; }
-        .up-cost { font-size: 0.7rem; color: #777; }
-        .up-count { position: absolute; right: 8px; bottom: 5px; font-size: 1rem; font-weight: bold; color: #444; }
+        #grid-background {
+            display: grid;
+            gap: 10px;
+            grid-template-columns: repeat(var(--grid-size), 1fr);
+            grid-template-rows: repeat(var(--grid-size), 1fr);
+            width: 100%;
+            height: 100%;
+        }
 
-        #save-msg {
+        .grid-cell {
+            background: rgba(255,255,255,0.05);
+            border-radius: 5px;
+            width: 100%;
+            height: 100%;
+        }
+
+        /* Peças Animadas */
+        .tile {
+            position: absolute;
+            border-radius: 5px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-weight: bold;
+            transition: all var(--anim-speed) ease-in-out;
+            z-index: 2;
+            box-sizing: border-box;
+        }
+
+        .tile-inner {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            border-radius: 5px;
+            animation: pop 0.2s ease-out;
+        }
+
+        @keyframes pop {
+            0% { transform: scale(0.5); }
+            100% { transform: scale(1); }
+        }
+
+        /* Cores dos Blocos */
+        .tile[data-value="2"] .tile-inner { background: #eee4da; color: #776e65; font-size: 2rem; }
+        .tile[data-value="4"] .tile-inner { background: #ede0c8; color: #776e65; font-size: 2rem; }
+        .tile[data-value="8"] .tile-inner { background: #f2b179; color: white; font-size: 2rem; }
+        .tile[data-value="16"] .tile-inner { background: #f59563; color: white; font-size: 2rem; }
+        .tile[data-value="32"] .tile-inner { background: #f67c5f; color: white; font-size: 2rem; }
+        .tile[data-value="64"] .tile-inner { background: #f65e3b; color: white; font-size: 2rem; }
+        .tile[data-value="128"] .tile-inner { background: #edcf72; color: white; font-size: 1.5rem; }
+        .tile[data-value="256"] .tile-inner { background: #edcc61; color: white; font-size: 1.5rem; }
+        .tile[data-value="512"] .tile-inner { background: #edc850; color: white; font-size: 1.5rem; }
+        .tile[data-value="1024"] .tile-inner { background: #edc53f; color: white; font-size: 1.2rem; }
+        .tile[data-value="2048"] .tile-inner { background: #edc22e; color: white; font-size: 1.2rem; box-shadow: 0 0 15px gold; }
+
+        /* --- Floating Text --- */
+        .floating-money {
+            position: absolute;
+            color: #4ecca3;
+            font-weight: bold;
+            pointer-events: none;
+            animation: floatUp 0.8s forwards;
+            z-index: 100;
+        }
+
+        @keyframes floatUp {
+            0% { transform: translateY(0); opacity: 1; }
+            100% { transform: translateY(-50px); opacity: 0; }
+        }
+
+        /* --- Shop --- */
+        #shop {
             position: fixed;
-            bottom: 15px;
-            font-size: 0.6rem;
-            color: #333;
-            text-transform: uppercase;
+            bottom: 0;
+            width: 100%;
+            background: var(--panel-bg);
+            display: flex;
+            overflow-x: auto;
+            padding: 10px;
+            gap: 10px;
+            border-top: 2px solid var(--text-color);
+            z-index: 20;
         }
 
-        /* Efeitos visuais por upgrade */
-        .void-active { animation: pulse-bg 4s infinite; }
-        @keyframes pulse-bg {
-            0% { background-color: #030303; }
-            50% { background-color: #0a000f; }
-            100% { background-color: #030303; }
+        .shop-item {
+            min-width: 140px;
+            background: #16213e;
+            padding: 10px;
+            border-radius: 8px;
+            text-align: center;
+            border: 1px solid transparent;
+            cursor: pointer;
+        }
+
+        .shop-item:active { transform: scale(0.95); }
+        .shop-item.disabled { opacity: 0.5; filter: grayscale(1); cursor: default; }
+
+        .shop-item h4 { font-size: 0.8rem; margin-bottom: 5px; color: #aaa; }
+        .shop-item .price { font-weight: bold; color: var(--accent); }
+        .shop-item .level { font-size: 0.7rem; color: #e94560; }
+
+        #controls {
+            margin-top: 15px;
+            display: flex;
+            gap: 20px;
+        }
+
+        .btn-action {
+            background: var(--text-color);
+            border: none;
+            color: white;
+            padding: 8px 15px;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+
+        #cooldown-bar {
+            height: 4px;
+            background: var(--accent);
+            width: 0%;
+            margin-top: 5px;
+            transition: width linear;
+        }
+
+        /* Botão de música (adicional) */
+        .music-toggle {
+            background: var(--accent);
+            border: none;
+            color: #1a1a2e;
+            padding: 8px 15px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: bold;
         }
     </style>
 </head>
-<body id="body">
+<body>
 
-    <div id="game-container">
-        <div id="nothing-counter">0</div>
-        <div id="nps-display">INEXISTÊNCIA ESTÁVEL</div>
-        
-        <button id="main-button">NADA</button>
+    <header id="header">
+        <h1>💰 2048 Tycoon</h1>
+        <div id="money-display">$ 0</div>
+        <button class="music-toggle" id="musicToggleBtn" onclick="toggleBackgroundMusic()">🎵 Música OFF</button>
+    </header>
 
-        <div class="upgrade-list" id="upgrades-grid"></div>
+    <div id="game-wrapper">
+        <div id="grid-background"></div>
+        <div id="tile-container"></div>
     </div>
 
-    <div id="save-msg">SISTEMA OPERACIONAL DO VAZIO ATIVO</div>
+    <div id="controls">
+        <button class="btn-action" onclick="resetGame()">Reiniciar Tudo</button>
+    </div>
+
+    <div id="shop">
+        <div class="shop-item" onclick="buyMinTile()">
+            <h4>🔼 Valor Mínimo</h4>
+            <div id="min-tile-price" class="price">$ 100</div>
+            <div id="min-tile-level" class="level">Nível 0 (Min: 2)</div>
+        </div>
+
+        <div class="shop-item" id="organize-btn" onclick="buyOrganize()">
+            <h4>🧹 Organizar</h4>
+            <div id="organize-price" class="price">$ 500</div>
+            <div class="level">Arrumar Peças (S)</div>
+            <div id="cooldown-bar"></div>
+        </div>
+
+        <div class="shop-item" onclick="buyExpand()">
+            <h4>📐 Expandir Grid</h4>
+            <div id="expand-price" class="price">$ 2.000</div>
+            <div id="expand-level" class="level">4x4</div>
+        </div>
+
+        <div class="shop-item" onclick="buyMultiplier()">
+            <h4>⚡ Multiplicador</h4>
+            <div id="mult-price" class="price">$ 150</div>
+            <div id="mult-level" class="level">x1</div>
+        </div>
+    </div>
+
+    <!-- Efeitos sonoros -->
+    <audio id="sfx-merge" src="https://actions.google.com/sounds/v1/water/air_squish_01.ogg"></audio>
+    <audio id="sfx-cash" src="https://actions.google.com/sounds/v1/office/typing_fast.ogg"></audio>
+    <!-- Música de fundo (loop) -->
+    <audio id="bg-music" loop>
+        <source src="https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3" type="audio/mpeg">
+        <!-- Fallback silencioso caso a URL falhe -->
+    </audio>
 
     <script>
-        // --- MOTOR DE ÁUDIO (Sintetizador) ---
-        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-        let ambientOsc = null;
-        let ambientGain = null;
-
-        function playSound(freq, type, duration, vol) {
-            if (audioCtx.state === 'suspended') audioCtx.resume();
-            const osc = audioCtx.createOscillator();
-            const gain = audioCtx.createGain();
-            osc.type = type;
-            osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
-            gain.gain.setValueAtTime(vol, audioCtx.currentTime);
-            gain.gain.exponentialRampToValueAtTime(0.00001, audioCtx.currentTime + duration);
-            osc.connect(gain);
-            gain.connect(audioCtx.destination);
-            osc.start();
-            osc.stop(audioCtx.currentTime + duration);
-        }
-
-        function initAmbient() {
-            if (ambientOsc) return;
-            ambientOsc = audioCtx.createOscillator();
-            ambientGain = audioCtx.createGain();
-            ambientOsc.type = 'sine';
-            ambientOsc.frequency.setValueAtTime(40, audioCtx.currentTime);
-            ambientGain.gain.setValueAtTime(0, audioCtx.currentTime);
-            ambientOsc.connect(ambientGain);
-            ambientGain.connect(audioCtx.destination);
-            ambientOsc.start();
-        }
-
-        // --- ESTADO DO JOGO ---
         let state = {
-            nadas: 0,
-            upgradesOwned: [0, 0, 0, 0, 0, 0, 0, 0]
+            money: 0,
+            gridSize: 4,
+            grid: [], 
+            minTilePower: 1,
+            multiplier: 1,
+            prices: { minTile: 100, organize: 500, expand: 2000, mult: 150 },
+            levels: { minTile: 0, expand: 1, mult: 1 },
+            organizeCooldown: false,
+            isAnimating: false,
+            nextId: 0
         };
 
-        const upgradeData = [
-            { name: "Eco Estático", cost: 15, power: 1, type: 'click' },
-            { name: "Vento do Vácuo", cost: 100, power: 1, type: 'auto' },
-            { name: "Sombra Digital", cost: 600, power: 6, type: 'auto' },
-            { name: "Pulso Negro", cost: 3000, power: 30, type: 'auto' },
-            { name: "Mantra do Vazio", cost: 12000, power: 120, type: 'auto' },
-            { name: "Colisor de Nada", cost: 65000, power: 550, type: 'auto' },
-            { name: "Singularidade", cost: 250000, power: 2200, type: 'auto' },
-            { name: "Deletador de Realidade", cost: 1000000, power: 10000, type: 'auto' }
-        ];
+        const wrapper = document.getElementById('game-wrapper');
+        const bgGrid = document.getElementById('grid-background');
+        const tileContainer = document.getElementById('tile-container');
+        const moneyEl = document.getElementById('money-display');
+        let musicEnabled = false;
+        const bgMusic = document.getElementById('bg-music');
 
-        let nps = 0;
-        let npc = 1;
-
-        // --- LÓGICA CORE ---
-        function calculateStats() {
-            nps = 0;
-            npc = 1;
-            state.upgradesOwned.forEach((count, i) => {
-                if (upgradeData[i].type === 'click') npc += (upgradeData[i].power * count);
-                else nps += (upgradeData[i].power * count);
-            });
-            
-            // Atualiza o som ambiente baseado no NPS
-            if (ambientGain) {
-                const vol = Math.min(nps / 10000, 0.1);
-                ambientGain.gain.setTargetAtTime(vol, audioCtx.currentTime, 0.5);
-                ambientOsc.frequency.setTargetAtTime(40 + (nps/500), audioCtx.currentTime, 0.5);
+        function init() {
+            loadGame();
+            setupGridUI();
+            if (state.grid.length === 0 || state.grid.every(cell => cell === null)) {
+                resetGrid();
+            } else {
+                renderGrid();
             }
-            
-            if (state.upgradesOwned[4] > 0) document.body.classList.add('void-active');
+            updateShopUI();
         }
 
-        function buyUpgrade(i) {
-            const cost = Math.floor(upgradeData[i].cost * Math.pow(1.2, state.upgradesOwned[i]));
-            if (state.nadas >= cost) {
-                state.nadas -= cost;
-                state.upgradesOwned[i]++;
-                playSound(150 - (i * 10), 'triangle', 0.5, 0.2);
-                calculateStats();
-                renderUpgrades();
-                save();
+        function setupGridUI() {
+            document.documentElement.style.setProperty('--grid-size', state.gridSize);
+            bgGrid.innerHTML = '';
+            for (let i = 0; i < state.gridSize * state.gridSize; i++) {
+                const cell = document.createElement('div');
+                cell.classList.add('grid-cell');
+                bgGrid.appendChild(cell);
             }
         }
 
-        // --- INTERFACE ---
-        function renderUpgrades() {
-            const grid = document.getElementById('upgrades-grid');
-            grid.innerHTML = '';
-            upgradeData.forEach((up, i) => {
-                const count = state.upgradesOwned[i];
-                const cost = Math.floor(up.cost * Math.pow(1.2, count));
-                const btn = document.createElement('button');
-                btn.className = 'upgrade-btn';
-                btn.disabled = state.nadas < cost;
-                btn.onclick = () => buyUpgrade(i);
-                btn.innerHTML = `
-                    <span class="up-name">${up.name}</span>
-                    <span class="up-cost">CUSTO: ${cost.toLocaleString()}</span>
-                    <span class="up-count">${count}</span>
-                `;
-                grid.appendChild(btn);
-            });
+        function resetGrid() {
+            state.grid = Array(state.gridSize * state.gridSize).fill(null);
+            addRandomTile();
+            addRandomTile();
+            renderGrid();
+            saveGame();
         }
 
-        document.getElementById('main-button').onclick = () => {
-            initAmbient();
-            state.nadas += npc;
-            playSound(400 + (Math.random() * 50), 'sine', 0.1, 0.1);
-            updateUI();
-        };
-
-        function updateUI() {
-            document.getElementById('nothing-counter').innerText = Math.floor(state.nadas).toLocaleString();
-            document.getElementById('nps-display').innerText = nps > 0 ? `${nps.toLocaleString()} NADAS/SEG` : "INEXISTÊNCIA ESTÁVEL";
-            
-            document.querySelectorAll('.upgrade-btn').forEach((btn, i) => {
-                const cost = Math.floor(upgradeData[i].cost * Math.pow(1.2, state.upgradesOwned[i]));
-                btn.disabled = state.nadas < cost;
-            });
-        }
-
-        // --- SISTEMA ---
-        function save() { localStorage.setItem('imperio31', JSON.stringify(state)); }
-        function load() {
-            const saved = localStorage.getItem('imperio31');
-            if (saved) state = JSON.parse(saved);
-            calculateStats();
-            renderUpgrades();
-        }
-
-        setInterval(() => {
-            if (nps > 0) {
-                state.nadas += (nps / 10);
-                updateUI();
+        function addRandomTile() {
+            const emptyCells = state.grid.map((val, idx) => val === null ? idx : null).filter(val => val !== null);
+            if (emptyCells.length > 0) {
+                const randomIdx = emptyCells[Math.floor(Math.random() * emptyCells.length)];
+                const power = Math.random() < 0.9 ? state.minTilePower : state.minTilePower + 1;
+                state.grid[randomIdx] = { 
+                    value: Math.pow(2, power), 
+                    id: state.nextId++ 
+                };
             }
-        }, 100);
+        }
 
-        load();
+        function renderGrid() {
+            const size = 100 / state.gridSize;
+            const currentIds = state.grid.filter(t => t !== null).map(t => t.id);
+            const tileElements = Array.from(tileContainer.children);
+
+            tileElements.forEach(el => {
+                if (!currentIds.includes(parseInt(el.dataset.id))) {
+                    el.remove();
+                }
+            });
+
+            state.grid.forEach((tile, index) => {
+                if (tile !== null) {
+                    let el = tileContainer.querySelector(`[data-id="${tile.id}"]`);
+                    if (!el) {
+                        el = document.createElement('div');
+                        el.className = 'tile';
+                        el.dataset.id = tile.id;
+                        el.innerHTML = `<div class="tile-inner">${tile.value}</div>`;
+                        tileContainer.appendChild(el);
+                    }
+                    
+                    const row = Math.floor(index / state.gridSize);
+                    const col = index % state.gridSize;
+                    
+                    el.style.width = `calc(${size}% - 10px)`;
+                    el.style.height = `calc(${size}% - 10px)`;
+                    el.style.top = `calc(${row * size}% + 5px)`;
+                    el.style.left = `calc(${col * size}% + 5px)`;
+                    el.setAttribute('data-value', tile.value);
+                    el.querySelector('.tile-inner').innerText = tile.value;
+                }
+            });
+
+            moneyEl.innerText = `$ ${Math.floor(state.money).toLocaleString()}`;
+            updateShopUI();
+        }
+
+        async function move(direction) {
+            if (state.isAnimating) return;
+            
+            // Backup para comparação
+            const gridBefore = JSON.stringify(state.grid);
+            let moved = false;
+            const size = state.gridSize;
+
+            const getLine = (i) => {
+                let line = [];
+                for (let j = 0; j < size; j++) {
+                    if (direction === 'left' || direction === 'right') line.push(state.grid[i * size + j]);
+                    else line.push(state.grid[i + j * size]);
+                }
+                return line;
+            };
+
+            const setLine = (i, line) => {
+                for (let j = 0; j < size; j++) {
+                    if (direction === 'left' || direction === 'right') state.grid[i * size + j] = line[j];
+                    else state.grid[i + j * size] = line[j];
+                }
+            };
+
+            for (let i = 0; i < size; i++) {
+                let line = getLine(i);
+                if (direction === 'right' || direction === 'down') line.reverse();
+
+                let compressed = line.filter(t => t !== null);
+                for (let j = 0; j < compressed.length - 1; j++) {
+                    if (compressed[j].value === compressed[j+1].value) {
+                        const newValue = compressed[j].value * 2;
+                        compressed[j] = { value: newValue, id: compressed[j].id };
+                        compressed.splice(j + 1, 1);
+                        earnMoney(newValue);
+                        playSFX('sfx-merge');
+                    }
+                }
+
+                while (compressed.length < size) compressed.push(null);
+                if (direction === 'right' || direction === 'down') compressed.reverse();
+                setLine(i, compressed);
+            }
+
+            const gridAfter = JSON.stringify(state.grid);
+            
+            // Só continua se o grid realmente mudou
+            if (gridBefore !== gridAfter) {
+                state.isAnimating = true;
+                renderGrid();
+                
+                await new Promise(resolve => setTimeout(resolve, 300));
+                
+                addRandomTile();
+                renderGrid();
+                saveGame();
+                state.isAnimating = false;
+            }
+        }
+
+        function earnMoney(amount) {
+            const total = amount * state.multiplier;
+            state.money += total;
+            showFloatingText(`+$${total}`);
+            playSFX('sfx-cash');
+        }
+
+        function showFloatingText(text) {
+            const el = document.createElement('div');
+            el.className = 'floating-money';
+            el.innerText = text;
+            el.style.left = `${Math.random() * 60 + 20}%`;
+            el.style.top = `40%`;
+            wrapper.appendChild(el);
+            setTimeout(() => el.remove(), 800);
+        }
+
+        function buyMinTile() {
+            if (state.money >= state.prices.minTile) {
+                state.money -= state.prices.minTile;
+                state.minTilePower++;
+                state.levels.minTile++;
+                state.prices.minTile = Math.floor(state.prices.minTile * 2.5);
+                state.grid = state.grid.map(t => (t !== null && t.value < Math.pow(2, state.minTilePower)) ? null : t);
+                renderGrid();
+                saveGame();
+            }
+        }
+
+        function buyMultiplier() {
+            if (state.money >= state.prices.mult) {
+                state.money -= state.prices.mult;
+                state.multiplier *= 2;
+                state.levels.mult++;
+                state.prices.mult = Math.floor(state.prices.mult * 3);
+                renderGrid();
+                saveGame();
+            }
+        }
+
+        function buyExpand() {
+            if (state.money >= state.prices.expand && state.gridSize < 8) {
+                state.money -= state.prices.expand;
+                const oldGrid = [...state.grid];
+                const oldSize = state.gridSize;
+                state.gridSize++;
+                state.prices.expand = Math.floor(state.prices.expand * 5);
+                state.grid = Array(state.gridSize * state.gridSize).fill(null);
+                for(let r=0; r<oldSize; r++) {
+                    for(let c=0; c<oldSize; c++) {
+                        state.grid[r * state.gridSize + c] = oldGrid[r * oldSize + c];
+                    }
+                }
+                setupGridUI();
+                renderGrid();
+                saveGame();
+            }
+        }
+
+        async function buyOrganize() {
+            if (state.organizeCooldown || state.isAnimating) return;
+            if (state.money >= state.prices.organize) {
+                state.money -= state.prices.organize;
+                state.isAnimating = true;
+
+                let tiles = state.grid.filter(t => t !== null).sort((a, b) => b.value - a.value);
+                let newGrid = Array(state.gridSize * state.gridSize).fill(null);
+                
+                let tileIdx = 0;
+                for (let r = 0; r < state.gridSize; r++) {
+                    if (r % 2 === 0) {
+                        for (let c = state.gridSize - 1; c >= 0; c--) {
+                            if (tileIdx < tiles.length) newGrid[r * state.gridSize + c] = tiles[tileIdx++];
+                        }
+                    } else {
+                        for (let c = 0; c < state.gridSize; c++) {
+                            if (tileIdx < tiles.length) newGrid[r * state.gridSize + c] = tiles[tileIdx++];
+                        }
+                    }
+                }
+
+                state.grid = newGrid;
+                renderGrid();
+
+                state.organizeCooldown = true;
+                const btn = document.getElementById('organize-btn');
+                const bar = document.getElementById('cooldown-bar');
+                btn.classList.add('disabled');
+                
+                bar.style.transition = 'none';
+                bar.style.width = '0%';
+                setTimeout(() => {
+                    bar.style.transition = 'width 10s linear';
+                    bar.style.width = '100%';
+                }, 50);
+
+                setTimeout(() => {
+                    state.organizeCooldown = false;
+                    btn.classList.remove('disabled');
+                    bar.style.width = '0%';
+                }, 10000);
+
+                await new Promise(r => setTimeout(r, 300));
+                state.isAnimating = false;
+                saveGame();
+            }
+        }
+
+        function updateShopUI() {
+            document.getElementById('min-tile-price').innerText = `$ ${state.prices.minTile.toLocaleString()}`;
+            document.getElementById('min-tile-level').innerText = `Nível ${state.levels.minTile} (Min: ${Math.pow(2, state.minTilePower)})`;
+            document.getElementById('organize-price').innerText = `$ ${state.prices.organize.toLocaleString()}`;
+            document.getElementById('expand-price').innerText = `$ ${state.prices.expand.toLocaleString()}`;
+            document.getElementById('expand-level').innerText = `${state.gridSize}x${state.gridSize}`;
+            document.getElementById('mult-price').innerText = `$ ${state.prices.mult.toLocaleString()}`;
+            document.getElementById('mult-level').innerText = `x${state.multiplier}`;
+        }
+
+        function playSFX(id) {
+            const sound = document.getElementById(id);
+            if (sound) {
+                sound.currentTime = 0;
+                sound.play().catch(() => {});
+            }
+        }
+
+        function toggleBackgroundMusic() {
+            const btn = document.getElementById('musicToggleBtn');
+            if (!musicEnabled) {
+                bgMusic.play().then(() => {
+                    musicEnabled = true;
+                    btn.innerText = '🎵 Música ON';
+                    btn.style.background = '#e94560';
+                    btn.style.color = 'white';
+                }).catch(e => {
+                    console.log("Autoplay bloqueado. Clique novamente se necessário.");
+                    // Tenta forçar com interação
+                    bgMusic.play().catch(() => {});
+                    musicEnabled = true;
+                    btn.innerText = '🎵 Música ON';
+                });
+            } else {
+                bgMusic.pause();
+                musicEnabled = false;
+                btn.innerText = '🎵 Música OFF';
+                btn.style.background = '#4ecca3';
+                btn.style.color = '#1a1a2e';
+            }
+        }
+
+        function saveGame() {
+            localStorage.setItem('2048TycoonSave_final', JSON.stringify({
+                ...state,
+                isAnimating: false,
+                organizeCooldown: false
+            }));
+        }
+
+        function loadGame() {
+            const saved = localStorage.getItem('2048TycoonSave_final');
+            if (saved) {
+                const loaded = JSON.parse(saved);
+                state = { ...state, ...loaded };
+                state.isAnimating = false;
+                state.organizeCooldown = false;
+            }
+        }
+
+        function resetGame() {
+            if(confirm("Reiniciar todo o império?")) {
+                localStorage.removeItem('2048TycoonSave_final');
+                location.reload();
+            }
+        }
+
+        window.addEventListener('keydown', e => {
+            if (e.key.includes('Arrow')) {
+                e.preventDefault();
+                move(e.key.replace('Arrow', '').toLowerCase());
+            }
+        });
+
+        let tsX, tsY;
+        wrapper.addEventListener('touchstart', e => { tsX = e.touches[0].clientX; tsY = e.touches[0].clientY; });
+        wrapper.addEventListener('touchend', e => {
+            const dx = e.changedTouches[0].clientX - tsX;
+            const dy = e.changedTouches[0].clientY - tsY;
+            if (Math.abs(dx) > Math.abs(dy)) {
+                if (Math.abs(dx) > 30) move(dx > 0 ? 'right' : 'left');
+            } else {
+                if (Math.abs(dy) > 30) move(dy > 0 ? 'down' : 'up');
+            }
+        });
+
+        init();
     </script>
 </body>
 </html>
