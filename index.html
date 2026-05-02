@@ -262,7 +262,7 @@
     </div>
 
     <div id="shop">
-        <div class="shop-item" onclick="buyMinTile()">
+        <div class="shop-item" id="minTileBtn" onclick="buyMinTile()">
             <h4>🔼 Valor Mínimo</h4>
             <div id="min-tile-price" class="price">$ 100</div>
             <div id="min-tile-level" class="level">Nível 0 (Min: 2)</div>
@@ -280,12 +280,6 @@
             <div id="expand-price" class="price">$ 2.000</div>
             <div id="expand-level" class="level">4x4</div>
         </div>
-
-        <div class="shop-item" onclick="buyMultiplier()">
-            <h4>⚡ Multiplicador</h4>
-            <div id="mult-price" class="price">$ 150</div>
-            <div id="mult-level" class="level">x1</div>
-        </div>
     </div>
 
     <audio id="sfx-merge" src="https://actions.google.com/sounds/v1/water/air_squish_01.ogg"></audio>
@@ -300,13 +294,12 @@
             gridSize: 4,
             grid: [], 
             minTilePower: 1,
-            multiplier: 1,
-            prices: { minTile: 100, organize: 500, expand: 2000, mult: 150 },
-            levels: { minTile: 0, expand: 1, mult: 1 },
+            prices: { minTile: 100, organize: 500, expand: 2000 },
+            levels: { minTile: 0, expand: 1 },
             organizeCooldown: false,
             isAnimating: false,
             nextId: 0,
-            hasReached2048: false      // flag para o primeiro 2048
+            hasReached2048: false
         };
 
         const wrapper = document.getElementById('game-wrapper');
@@ -357,15 +350,58 @@
             }
         }
 
-        // Calcula tamanho da fonte baseado no tamanho da tile e no número de dígitos
+        function getMaxTileValue() {
+            let max = 0;
+            for (let tile of state.grid) {
+                if (tile && tile.value > max) max = tile.value;
+            }
+            return max;
+        }
+
+        // Verifica se é seguro comprar o upgrade de valor mínimo
+        function canBuyMinTile() {
+            if (state.money < state.prices.minTile) return false;
+            const newMinValue = Math.pow(2, state.minTilePower + 1);
+            const currentMax = getMaxTileValue();
+            // Se não há peças ou a maior peça é menor que o novo mínimo, não pode comprar (tabuleiro ficaria vazio)
+            if (currentMax === 0) return false;
+            return currentMax >= newMinValue;
+        }
+
+        function buyMinTile() {
+            if (!canBuyMinTile()) return;
+            
+            state.money -= state.prices.minTile;
+            state.minTilePower++;
+            state.levels.minTile++;
+            state.prices.minTile = Math.floor(state.prices.minTile * 2.5);
+            
+            // Remove todas as peças com valor menor que o novo mínimo
+            const minAllowed = Math.pow(2, state.minTilePower);
+            state.grid = state.grid.map(t => {
+                if (t !== null && t.value < minAllowed) {
+                    return null;
+                }
+                return t;
+            });
+            
+            // Se por algum motivo o tabuleiro ficou vazio (não deveria, pois canBuyMinTile garantiu), adiciona uma peça
+            if (state.grid.every(cell => cell === null)) {
+                addRandomTile();
+            }
+            
+            renderGrid();
+            saveGame();
+        }
+
         function getFontSizeForTile(value, gridSize) {
             const wrapperWidth = wrapper.clientWidth;
             if (!wrapperWidth) return '1.5rem';
-            const tileTotalWidth = wrapperWidth - 20; // padding do wrapper
+            const tileTotalWidth = wrapperWidth - 20;
             const gap = 10;
             const tileSize = (tileTotalWidth - gap * (gridSize - 1)) / gridSize;
             const digits = value.toString().length;
-            let fontSize = Math.min(tileSize * 0.4, 40); // máximo 40px
+            let fontSize = Math.min(tileSize * 0.4, 40);
             if (digits > 3) fontSize = fontSize * 0.8;
             if (digits > 4) fontSize = fontSize * 0.7;
             return `${Math.max(12, fontSize)}px`;
@@ -405,14 +441,12 @@
                     const inner = el.querySelector('.tile-inner');
                     inner.innerText = tile.value;
                     
-                    // Aplica estilo especial para valores > 2048
                     if (tile.value > 2048) {
                         el.classList.add('high-value');
                     } else {
                         el.classList.remove('high-value');
                     }
                     
-                    // Ajusta fonte dinamicamente
                     const fontSize = getFontSizeForTile(tile.value, state.gridSize);
                     inner.style.fontSize = fontSize;
                 }
@@ -457,7 +491,6 @@
                         earnMoney(newValue);
                         playSFX('sfx-merge');
                         
-                        // Verifica se é o primeiro 2048
                         if (newValue === 2048 && !state.hasReached2048) {
                             state.hasReached2048 = true;
                             showCongrats("🎉 PARABÉNS! 2048 ALCANÇADO! 🎉");
@@ -484,9 +517,8 @@
         }
 
         function earnMoney(amount) {
-            const total = amount * state.multiplier;
-            state.money += total;
-            showFloatingText(`+$${total}`, '#4ecca3');
+            state.money += amount;
+            showFloatingText(`+$${amount}`, '#4ecca3');
             playSFX('sfx-cash');
         }
 
@@ -508,29 +540,6 @@
             el.style.top = '30%';
             wrapper.appendChild(el);
             setTimeout(() => el.remove(), 3000);
-        }
-
-        function buyMinTile() {
-            if (state.money >= state.prices.minTile) {
-                state.money -= state.prices.minTile;
-                state.minTilePower++;
-                state.levels.minTile++;
-                state.prices.minTile = Math.floor(state.prices.minTile * 2.5);
-                state.grid = state.grid.map(t => (t !== null && t.value < Math.pow(2, state.minTilePower)) ? null : t);
-                renderGrid();
-                saveGame();
-            }
-        }
-
-        function buyMultiplier() {
-            if (state.money >= state.prices.mult) {
-                state.money -= state.prices.mult;
-                state.multiplier *= 2;
-                state.levels.mult++;
-                state.prices.mult = Math.floor(state.prices.mult * 3);
-                renderGrid();
-                saveGame();
-            }
         }
 
         function buyExpand() {
@@ -607,8 +616,14 @@
             document.getElementById('organize-price').innerText = `$ ${state.prices.organize.toLocaleString()}`;
             document.getElementById('expand-price').innerText = `$ ${state.prices.expand.toLocaleString()}`;
             document.getElementById('expand-level').innerText = `${state.gridSize}x${state.gridSize}`;
-            document.getElementById('mult-price').innerText = `$ ${state.prices.mult.toLocaleString()}`;
-            document.getElementById('mult-level').innerText = `x${state.multiplier}`;
+            
+            // Controla o estado do botão Valor Mínimo
+            const minTileBtn = document.getElementById('minTileBtn');
+            if (!canBuyMinTile()) {
+                minTileBtn.classList.add('disabled');
+            } else {
+                minTileBtn.classList.remove('disabled');
+            }
         }
 
         function playSFX(id) {
@@ -690,7 +705,7 @@
             }
         });
 
-        window.addEventListener('resize', () => renderGrid()); // Reajusta fontes ao redimensionar
+        window.addEventListener('resize', () => renderGrid());
 
         init();
     </script>
