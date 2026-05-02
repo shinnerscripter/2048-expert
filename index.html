@@ -201,6 +201,7 @@
 
         .shop-item:active { transform: scale(0.96); }
         .shop-item.disabled { opacity: 0.5; filter: grayscale(1); cursor: default; pointer-events: none; }
+        .shop-item.hidden { display: none; }  /* para esconder o expandir no max */
 
         .shop-item h4 { font-size: 0.9rem; margin-bottom: 6px; color: #ddd; }
         .shop-item .price { font-weight: bold; color: var(--accent); font-size: 1rem; }
@@ -275,7 +276,7 @@
             <div id="cooldown-bar"></div>
         </div>
 
-        <div class="shop-item" onclick="buyExpand()">
+        <div class="shop-item" id="expand-btn" onclick="buyExpand()">
             <h4>📐 Expandir Grid</h4>
             <div id="expand-price" class="price">$ 2.000</div>
             <div id="expand-level" class="level">4x4</div>
@@ -296,13 +297,15 @@
             minTilePower: 1,
             prices: { minTile: 100, organize: 500, expand: 2000 },
             levels: { minTile: 0, expand: 1 },
-            organizeCooldownMoves: 0,      // movimentos restantes para desbloquear
+            organizeCooldownMoves: 0,
             isAnimating: false,
             nextId: 0,
             hasReached2048: false
         };
 
-        const ORGANIZE_COOLDOWN_MAX_MOVES = 5;  // número de movimentos necessários
+        const ORGANIZE_COOLDOWN_MAX_MOVES = 5;
+        const MAX_GRID_SIZE = 8;
+        const PRICE_INCREASE_RATE = 1.5; // 50% de aumento
 
         const wrapper = document.getElementById('game-wrapper');
         const bgGrid = document.getElementById('grid-background');
@@ -311,10 +314,8 @@
         let musicEnabled = false;
         const bgMusic = document.getElementById('bg-music');
 
-        // Função para encurtar números grandes (K, M, B, T, Qa, Qi, ...)
         function formatTileValue(value) {
             if (value < 262144) return value.toString();
-            
             const suffixes = ["", "K", "M", "B", "T", "Qa", "Qi", "Sx", "Sp", "Oc", "No", "Dc"];
             let magnitude = 0;
             let temp = value;
@@ -322,7 +323,6 @@
                 temp /= 1000;
                 magnitude++;
             }
-            // Formata com 1 casa decimal se < 1000 na nova unidade, senão inteiro
             if (temp < 10) {
                 return temp.toFixed(1) + suffixes[magnitude];
             } else {
@@ -340,6 +340,7 @@
             }
             updateShopUI();
             updateOrganizeCooldownUI();
+            checkExpandVisibility();
         }
 
         function setupGridUI() {
@@ -394,7 +395,7 @@
             state.money -= state.prices.minTile;
             state.minTilePower++;
             state.levels.minTile++;
-            state.prices.minTile = Math.floor(state.prices.minTile * 2.5);
+            state.prices.minTile = Math.ceil(state.prices.minTile * PRICE_INCREASE_RATE);
             
             const minAllowed = Math.pow(2, state.minTilePower);
             state.grid = state.grid.map(t => {
@@ -457,7 +458,6 @@
                     el.setAttribute('data-value', tile.value);
                     
                     const inner = el.querySelector('.tile-inner');
-                    // Exibe número encurtado se for >= 262144
                     inner.innerText = formatTileValue(tile.value);
                     
                     if (tile.value > 2048) {
@@ -533,12 +533,10 @@
                 saveGame();
                 state.isAnimating = false;
                 
-                // --- Atualiza cooldown do organizador baseado em movimento ---
                 if (state.organizeCooldownMoves > 0) {
                     state.organizeCooldownMoves--;
                     updateOrganizeCooldownUI();
                     if (state.organizeCooldownMoves === 0) {
-                        // Reativa o botão (a classe disabled será removida no updateShopUI)
                         updateShopUI();
                     }
                 }
@@ -572,12 +570,13 @@
         }
 
         function buyExpand() {
-            if (state.money >= state.prices.expand && state.gridSize < 8) {
+            if (state.gridSize >= MAX_GRID_SIZE) return;
+            if (state.money >= state.prices.expand) {
                 state.money -= state.prices.expand;
                 const oldGrid = [...state.grid];
                 const oldSize = state.gridSize;
                 state.gridSize++;
-                state.prices.expand = Math.floor(state.prices.expand * 5);
+                state.prices.expand = Math.ceil(state.prices.expand * PRICE_INCREASE_RATE);
                 state.grid = Array(state.gridSize * state.gridSize).fill(null);
                 for(let r=0; r<oldSize; r++) {
                     for(let c=0; c<oldSize; c++) {
@@ -587,19 +586,28 @@
                 setupGridUI();
                 renderGrid();
                 saveGame();
+                checkExpandVisibility(); // esconde se atingiu máximo
+            }
+        }
+
+        function checkExpandVisibility() {
+            const expandBtn = document.getElementById('expand-btn');
+            if (state.gridSize >= MAX_GRID_SIZE) {
+                expandBtn.classList.add('hidden');
+            } else {
+                expandBtn.classList.remove('hidden');
             }
         }
 
         async function buyOrganize() {
-            // Verifica se está em cooldown ou já tem movimentos pendentes
             if (state.organizeCooldownMoves > 0) return;
             if (state.isAnimating) return;
             if (state.money >= state.prices.organize) {
                 state.money -= state.prices.organize;
                 state.isAnimating = true;
 
-                // Aplica aumento de 20% no preço para a próxima compra
-                state.prices.organize = Math.ceil(state.prices.organize * 1.2);
+                // Aumento de 50% no preço
+                state.prices.organize = Math.ceil(state.prices.organize * PRICE_INCREASE_RATE);
 
                 let tiles = state.grid.filter(t => t !== null).sort((a, b) => b.value - a.value);
                 let newGrid = Array(state.gridSize * state.gridSize).fill(null);
@@ -620,7 +628,6 @@
                 state.grid = newGrid;
                 renderGrid();
 
-                // Inicia cooldown baseado em movimentos
                 state.organizeCooldownMoves = ORGANIZE_COOLDOWN_MAX_MOVES;
                 updateOrganizeCooldownUI();
 
@@ -657,8 +664,8 @@
                 minTileBtn.classList.remove('disabled');
             }
             
-            // Atualiza visual do cooldown
             updateOrganizeCooldownUI();
+            checkExpandVisibility();
         }
 
         function playSFX(id) {
@@ -704,7 +711,6 @@
                 const loaded = JSON.parse(saved);
                 state = { ...state, ...loaded };
                 state.isAnimating = false;
-                // Garante que o cooldown não fique negativo
                 if (state.organizeCooldownMoves === undefined) state.organizeCooldownMoves = 0;
                 if (state.organizeCooldownMoves < 0) state.organizeCooldownMoves = 0;
             }
